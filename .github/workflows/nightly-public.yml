@@ -1,0 +1,52 @@
+name: Nightly (public ParaBank)
+
+# Hits the shared, Cloudflare-protected public site: 1 worker, never overlapping.
+on:
+  schedule:
+    - cron: '17 2 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: nightly-public
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  public:
+    name: Smoke + a11y (public site)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      BASE_URL: https://parabank.parasoft.com/parabank/
+      WORKERS: 1 # Cloudflare IP rate limit; do not raise
+      # Public-site profile (docs/evidence/TEST-RESULTS-ANALYSIS.md section 1.6). The full suite is
+      # ~8 min of continuous traffic and a Cloudflare challenge was seen at ~9.7 min, so only
+      # @smoke + @a11y run here; full regression runs on the docker job in ci.yml.
+      RATE_LIMIT_RPM: 60
+      RATE_LIMIT_TEST_BUDGET: 20 # measured p90 test cost ~16 requests (fix-round smoke run)
+      RATE_LIMIT_MAX_WAIT_S: 330 # wait out one ~180-300 s ban instead of a cascade of red tests
+      RETRIES: 0 # a retry after a ban/challenge only re-sends traffic
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+        with:
+          browsers: chromium
+      # Reporters come from the config under CI=true: list, html, junit (results/junit.xml).
+      # Infra failures carry `failure-class` annotations (A RATE_LIMITED, B CF_CHALLENGE/CF_BLOCK).
+      - name: Run smoke + a11y
+        run: npx playwright test --project=chromium --project=a11y --grep "@smoke|@a11y"
+      - name: Job summary
+        if: always()
+        run: node .github/scripts/junit-summary.mjs results/junit.xml "Nightly public site" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
+        if: ${{ !cancelled() }}
+        with:
+          name: nightly-report-${{ github.run_id }}
+          path: |
+            playwright-report/
+            test-results/
+            results/
+          retention-days: 14
+          if-no-files-found: warn

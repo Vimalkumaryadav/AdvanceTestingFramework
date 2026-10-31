@@ -1,0 +1,44 @@
+{
+  "name": "advance-testing-framework",
+  "version": "1.0.0",
+  "description": "Production-ready Playwright + TypeScript UI framework for ParaBank",
+  "scripts": {
+    "test": "playwright test",
+    "test:smoke": "playwright test --project=chromium --grep @smoke",
+    "test:regression": "playwright test --project=chromium --grep @regression",
+    "test:a11y": "playwright test --project=a11y",
+    "test:perf": "playwright test --project=perf",
+    "test:unit": "playwright test --project=unit",
+    "test:headed": "playwright test --project=chromium --headed",
+    "test:debug": "playwright test --project=chromium --debug",
+    "test:list": "playwright test --list",
+    "report": "playwright show-report",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "tsc --noEmit",
+    "verify": "npm run typecheck && npm run lint && npm run format:check && npm run test:list && npm run test:unit",
+    "parabank:up": "docker compose up -d && node scripts/wait-for-parabank.mjs",
+    "parabank:down": "docker compose down -v"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
+    "@eslint/js": "^9.39.5",
+    "@faker-js/faker": "^9.9.0",
+    "@playwright/test": "^1.64.1",
+    "@types/node": "^22.20.5",
+    "eslint": "^9.39.5",
+    "eslint-plugin-playwright": "^2.12.1",
+    "prettier": "^3.9.10",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.72.1"
+  },
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  }
+}

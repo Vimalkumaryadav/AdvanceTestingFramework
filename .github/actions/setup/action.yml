@@ -1,0 +1,35 @@
+name: Setup project
+description: Node from .nvmrc, cached npm install, optional cached Playwright browser.
+inputs:
+  browsers:
+    description: Playwright browsers to install (space separated). Empty string skips the browser install.
+    default: ''
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v7
+      with:
+        node-version-file: .nvmrc
+        cache: npm
+    - run: npm ci
+      shell: bash
+    - name: Resolve Playwright version
+      if: inputs.browsers != ''
+      id: pw
+      shell: bash
+      run: echo "version=$(npx playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+    - name: Cache Playwright browsers
+      if: inputs.browsers != ''
+      id: pw-cache
+      uses: actions/cache@v6
+      with:
+        path: ~/.cache/ms-playwright
+        key: pw-${{ runner.os }}-${{ steps.pw.outputs.version }}-${{ inputs.browsers }}
+    - name: Install browsers and OS deps
+      if: inputs.browsers != '' && steps.pw-cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: npx playwright install --with-deps ${{ inputs.browsers }}
+    - name: Install OS deps only (browsers restored from cache)
+      if: inputs.browsers != '' && steps.pw-cache.outputs.cache-hit == 'true'
+      shell: bash
+      run: npx playwright install-deps ${{ inputs.browsers }}

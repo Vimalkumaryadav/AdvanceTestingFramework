@@ -1,0 +1,123 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify (typecheck, lint, format, list)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      # No browsers: `playwright test --list` needs none. Pass `browsers: chromium` to cache/install them.
+      - uses: ./.github/actions/setup
+      - run: npm run verify
+
+  e2e-docker:
+    name: E2E regression (docker, shard ${{ matrix.shard }}/${{ strategy.job-total }})
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    env:
+      BASE_URL: http://localhost:8080/parabank/
+      WORKERS: 2 # runner has 4 vCPUs and also hosts the ParaBank container
+      PLAYWRIGHT_BLOB_OUTPUT_DIR: blob-report
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+        with:
+          browsers: chromium
+
+      - name: Start ParaBank
+        run: docker compose up -d
+
+      - name: Wait for ParaBank (fails the job if it never answers)
+        run: |
+          if ! node scripts/wait-for-parabank.mjs 240; then
+            echo "::error title=ParaBank not ready::No HTTP 200 from ${BASE_URL}index.htm within 240s. The /parabank context path or start-up time of parasoft/parabank:latest is UNVERIFIED; see the diagnostics above and fix docker-compose.yml / BASE_URL."
+            echo "--- docker compose ps ---";           docker compose ps || true
+            echo "--- container logs (tail) ---";       docker compose logs --tail=200 || true
+            for p in "" parabank/ parabank/index.htm; do
+              echo "--- probe http://localhost:8080/$p ---"
+              curl -s -m 10 -o /dev/null -w "HTTP %{http_code}\n" "http://localhost:8080/$p" || echo "no response"
+            done
+            exit 1
+          fi
+
+      - name: Run regression (shard ${{ matrix.shard }}/${{ strategy.job-total }})
+        run: >
+          npx playwright test --project=chromium --grep @regression
+          --shard=${{ matrix.shard }}/${{ strategy.job-total }}
+          --reporter=blob,list
+
+      - name: Container logs (on failure)
+        if: failure()
+        run: docker compose logs --no-color > parabank-container.log || true
+
+      - uses: actions/upload-artifact@v7
+        if: ${{ !cancelled() }}
+        with:
+          name: blob-report-${{ matrix.shard }}
+          path: blob-report/
+          retention-days: 3
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: failure-details-${{ matrix.shard }}
+          path: |
+            test-results/
+            parabank-container.log
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Stop ParaBank
+        if: always()
+        run: docker compose down -v
+
+  merge-reports:
+    name: Merge reports
+    needs: e2e-docker
+    if: ${{ !cancelled() && needs.e2e-docker.result != 'skipped' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      PLAYWRIGHT_HTML_OPEN: never
+      PLAYWRIGHT_JUNIT_OUTPUT_FILE: results/junit.xml
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: blob-report-*
+          path: all-blob-reports
+          merge-multiple: true
+      - name: Merge blobs into one HTML report and JUnit
+        run: npx playwright merge-reports --reporter=html,junit ./all-blob-reports
+      - name: Job summary
+        if: always()
+        run: node .github/scripts/junit-summary.mjs results/junit.xml "E2E regression (docker)" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            results/
+          retention-days: 14
+          if-no-files-found: warn

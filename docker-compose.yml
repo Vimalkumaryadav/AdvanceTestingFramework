@@ -1,0 +1,19 @@
+# Self-hosted ParaBank for parallel / CI runs without Cloudflare rate limits or shared-DB resets.
+#
+#   npm run parabank:up      # docker compose up -d + wait until the app answers
+#   BASE_URL=http://localhost:8080/parabank/ npm test
+#   npm run parabank:down
+#
+# Image verified on Docker Hub (2026-10-31): parasoft/parabank, tags latest | feature | baseline,
+# multi-arch (amd64, arm64), documented run command `docker run -p 8080:8080 parasoft/parabank`.
+# UNVERIFIED locally (Docker was not available on the authoring machine): the /parabank context
+# path and start-up time. Pin a digest instead of `latest` once you have pulled a known-good image.
+services:
+  parabank:
+    image: parasoft/parabank:latest
+    container_name: parabank
+    ports:
+      - '8080:8080' # web UI + REST (http://localhost:8080/parabank/)
+      # - '61616:61616' # Loan Processor JMS endpoint (optional)
+      # - '9001:9001'   # HSQLDB endpoint (optional)
+    restart: unless-stopped

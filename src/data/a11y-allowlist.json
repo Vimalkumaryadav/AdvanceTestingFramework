@@ -1,0 +1,34 @@
+{
+  "gatedImpacts": ["critical", "serious"],
+  "global": ["color-contrast", "html-has-lang", "image-alt", "link-name"],
+  "pages": {
+    "index": ["label"],
+    "register": ["label"],
+    "lookup": ["label"],
+    "about": ["label"],
+    "services": ["label"],
+    "contact": ["label"],
+    "overview": [],
+    "openaccount": ["select-name"],
+    "transfer": ["label", "select-name"],
+    "billpay": ["label", "select-name"],
+    "findtrans": ["label", "select-name"],
+    "updateprofile": ["label"],
+    "requestloan": ["label", "select-name"]
+  },
+  "baselineNodeCounts": {
+    "index": { "color-contrast": 6, "label": 2 },
+    "register": { "color-contrast": 14, "label": 13 },
+    "lookup": { "color-contrast": 10, "label": 9 },
+    "about": { "color-contrast": 3, "label": 2 },
+    "services": { "color-contrast": 56, "label": 2 },
+    "contact": { "color-contrast": 7, "label": 6 },
+    "overview": { "color-contrast": 4 },
+    "openaccount": { "color-contrast": 3, "select-name": 2 },
+    "transfer": { "color-contrast": 3, "label": 1, "select-name": 2 },
+    "billpay": { "color-contrast": 13, "label": 9, "select-name": 1 },
+    "findtrans": { "color-contrast": 3, "label": 5, "select-name": 1 },
+    "updateprofile": { "color-contrast": 10, "label": 7 },
+    "requestloan": { "color-contrast": 6, "label": 2, "select-name": 1 }
+  }
+}
